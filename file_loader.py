@@ -19,12 +19,7 @@ def extract_text(filepath):
 
     # ---------- DOCX ----------
     elif extension == ".docx":
-        document = Document(filepath)
-        text = []
-
-        for paragraph in document.paragraphs:
-            text.append(paragraph.text)
-
+        text = [paragraph.text for paragraph in Document(filepath).paragraphs]
         return "#".join(text)
 
     # ---------- PDF ----------
@@ -35,7 +30,7 @@ def extract_text(filepath):
         for page in reader.pages:
             extracted = page.extract_text()
 
-            if extracted:
+            if extracted and extracted.strip():
                 text.append(extracted)
 
         return "#".join(text)
