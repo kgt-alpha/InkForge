@@ -3,6 +3,8 @@ from PIL import Image
 import random
 import string
 import os
+from realism import apply_realism, jitter_offset
+from file_loader import extract_text
 
 width, height = 715, 760
 arr = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+,.-?:/*<>}{()=[]$" '
@@ -35,13 +37,27 @@ def savepage():
 def pasteimg(case, start, height):
     global back
     try:
+        # Open the handwritten character image
         cases = Image.open(imgsource + "%s.png" % case)
-        back.paste(cases, (start, height), mask=cases)
+
+        # NEW: Apply realism effects (rotation, tint, etc.)
+        cases = apply_realism(cases)
+
+        # NEW: Add slight vertical randomness to mimic human handwriting
+        paste_y = height + jitter_offset()
+
+        # Paste the processed character onto the page
+        back.paste(cases, (start, paste_y), mask=cases)
+
+        # Move the writing position for the next character
         start = start + cases.width + random.randint(5, 15)
+
     except FileNotFoundError:
-        # Silently skip missing image
+        # Silently skip missing character images
         pass
+
     except Exception as e:
         print(f"Unexpected error with case '{case}': {e}")
+
     return start
     
