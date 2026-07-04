@@ -1,6 +1,7 @@
 from PIL import Image
 # import pytesseract
 import random
+from countwordlen import imgwidth
 import string
 import os
 from realism import apply_realism, jitter_offset
@@ -58,6 +59,176 @@ def pasteimg(case, start, height):
 
     except Exception as e:
         print(f"Unexpected error with case '{case}': {e}")
-
+   
     return start
     
+def getname(letter):
+    symbol_map = {
+        ",": "coma",
+        ".": "fs",
+        "?": "que",
+        "<": "ang1",
+        ">": "ang2",
+        "{": "cur1",
+        "}": "cur2",
+        ":": "colon",
+        "/": "div",
+        "-": "sub",
+        "(": "par1",
+        ")": "par2",
+        "[": "sqr1",
+        "]": "sqr2",
+        "*": "star",
+        "=": "equal",
+        "+": "plus",
+        "$": lambda: "dol" + str(random.randint(1, 2)),
+        '"': "quo"
+    }
+
+    if letter.isupper():
+        return "c" + letter.lower()
+    elif letter in symbol_map:
+        mapped = symbol_map[letter]
+        return mapped() if callable(mapped) else mapped
+    return letter
+
+def getwordpix(word):
+    wordwid = 0
+    for char in word:
+        if char in arr:
+            img = getname(char)
+            try:
+                wordwid += imgwidth[img]
+            except KeyError:
+                continue
+            except Exception as e:
+                print(f"Unexpected error with character '{img}': {e}")
+    return wordwid
+
+def getnewline(start, cur, end, height):
+    global back
+    height = height + 244
+    if height > pageheight:
+        getnewpage()
+        return start, 760
+    else:
+        start = 720 + (random.randint(0, 100))
+    return start, height
+
+def getnewpage():
+    savepage()
+    getpage()
+
+def formatting(word, leng, start, cur, ecfnd):
+    global height
+    if leng >= 2:
+        if word[:2] == "^^":
+            word = word[2:]
+            cur += (2418 - int(getwordpix(word) / 2))
+        if word[:2] == "->":
+            word = word[2:]
+            cur += 400
+    return word, cur
+
+def checktag(content, i, height, start, cur, end):
+    if content[i] == "<table>":
+        try:
+            print("Making table....")
+            index = content.index("</table>", i + 1)
+            content = content[i + 1:index]
+            cols = int(content[0])
+            total = 0
+            ratio = [0]
+            for j in range(1, cols + 1):
+                total += int(content[j])
+                ratio.append(int(content[j]))
+            base = (end - start) / total
+            content = content[cols + 1:index]
+            content = " ".join(content)
+            row = content.split("#")
+            maxheight = 0
+            i = 0
+            lastheight = height
+            for R in row:
+                for C in R.split("|"):
+                    C = C.split()
+                    start, cur, end, height1 = condition(
+                        lastheight, start + base * ratio[i], start + base * ratio[i], start + base * ratio[i + 1], C)
+                    if height1 > maxheight:
+                        maxheight = height1
+                lastheight = maxheight
+                i += 1
+            return index + 1
+        except Exception as e:
+            print(e)
+            print("     </table> not found")
+            exit()
+    return 0
+
+def condition(height, start, cur, end, content):
+    global arr, back
+    first = 1
+    for i in range(0, len(content)):
+        word = content[i]
+        ind = checktag(content, i, height, start, cur, end)
+        if ind:
+            i = ind
+            continue
+        halfword = 0
+        leng = len(word)
+        word, cur = formatting(word, leng, start, cur, end)
+        wordwid = getwordpix(word)
+        widthafterpaste = cur + wordwid + 70
+        cur += 60 + random.randint(0, 35)
+        if widthafterpaste > end:
+            diff = widthafterpaste - end
+            if leng > 5 and diff > ((0.4 * leng) + 250):
+                halfword = 1
+            else:
+                cur, height = getnewline(start, cur, end, height)
+        if height > 3500 and first:
+            height += 10
+            first = 0
+        for letter in word:
+            if letter == "#":
+                cur, height = getnewline(start, cur, end, height)
+                continue
+            if letter in arr:
+                letter = getname(letter)
+                if halfword and cur + random.randint(200, 280) >= end:
+                    cur, height = getnewline(start, cur, end, height)
+                cur = pasteimg(letter, cur, height)
+    return start, cur, end, height
+
+def readfile():
+    pass
+
+def extract(filepath="MyText.txt"):
+    try:
+        # Read text from TXT, DOCX, or PDF
+        content = extract_text(filepath)
+
+        print(content)
+
+        # Treat '#' as a separate token so paragraph breaks work correctly
+        content = content.replace("#", " # ").split()
+
+        # Create a new page
+        getpage()
+
+        # Start writing on the page
+        condition(height, start, start, end, content)
+
+        # Save the generated page(s)
+        savepage()
+
+    except Exception as e:
+        print(e)
+
+if __name__ == "__main__":
+    import sys
+
+    # If a file is provided, use it; otherwise default to MyText.txt
+    path = sys.argv[1] if len(sys.argv) > 1 else "MyText.txt"
+
+    extract(path)
